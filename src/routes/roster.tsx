@@ -58,6 +58,11 @@ function RosterPage() {
                   <p className="text-sm font-medium">{s.name}</p>
                   <p className="text-xs text-muted-foreground">{s.studentId}</p>
                 </div>
+                {s.active && (
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-400">
+                    Active
+                  </span>
+                )}
               </li>
             ))}
             {q.data && filtered?.length === 0 && (
