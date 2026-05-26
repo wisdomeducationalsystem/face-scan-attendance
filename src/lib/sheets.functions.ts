@@ -66,16 +66,23 @@ export const getStudents = createServerFn({ method: "POST" })
     const headers = values[0].map((h) => h.trim());
     const idIdx = headers.findIndex((h) => /^(studentid|id|student\s*id)$/i.test(h));
     const nameIdx = headers.findIndex((h) => /^(name|fullname|student\s*name)$/i.test(h));
+    const activeIdx = headers.findIndex((h) => /^active$/i.test(h));
     if (idIdx === -1 || nameIdx === -1) {
       throw new Error(
         `Couldn't find StudentID and Name columns in "${data.sheetName}". Found headers: ${headers.join(", ")}`,
       );
     }
+    const isActiveValue = (val: string) => {
+      const v = String(val).trim().toLowerCase();
+      return v === "active" || v === "yes" || v === "true" || v === "1" || v === "y";
+    };
     const students = values.slice(1)
       .filter((row) => row[idIdx]?.trim())
+      .filter((row) => activeIdx === -1 || isActiveValue(row[activeIdx] ?? ""))
       .map((row) => ({
         studentId: String(row[idIdx] ?? "").trim(),
         name: String(row[nameIdx] ?? "").trim(),
+        active: activeIdx === -1 ? true : isActiveValue(row[activeIdx] ?? ""),
       }));
     return { headers, students };
   });
