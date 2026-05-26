@@ -41,7 +41,7 @@ function SettingsPage() {
     setTestResult(null);
     try {
       const result = await meta({ data: { spreadsheetId: s.spreadsheetId } });
-      setTestResult(`✓ Connected to "${result.title}" — sheets: ${result.sheets.map((x) => x.title).join(", ")}`);
+      setTestResult(`✓ Connected to "${result.title}" — sheets: ${result.sheets.map((x: { title: string }) => x.title).join(", ")}`);
     } catch (e) {
       setTestResult(`✗ ${(e as Error).message}`);
     } finally {
