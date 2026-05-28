@@ -103,15 +103,36 @@ async function ensureAttendanceSheet(spreadsheetId: string, sheetName: string) {
     });
     // header row
     await gw(
-      `/spreadsheets/${spreadsheetId}/values/${sheetName}!A1:E1?valueInputOption=USER_ENTERED`,
+      `/spreadsheets/${spreadsheetId}/values/${sheetName}!A1:J1?valueInputOption=USER_ENTERED`,
       {
         method: "PUT",
         body: JSON.stringify({
-          values: [["Timestamp", "Date", "StudentID", "Name", "Status"]],
+          values: [[
+            "Scan ID", "ID", "Name", "Institute", "Date",
+            "In Time", "Out Time", "Duration", "Employee/Student", "Status",
+          ]],
         }),
       },
     );
   }
+}
+
+function randomScanId() {
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function pad(n: number) {
+  return n.toString().padStart(2, "0");
+}
+
+function formatDate(d: Date) {
+  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+}
+
+function formatTime(d: Date) {
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 export const appendAttendance = createServerFn({ method: "POST" })
@@ -122,25 +143,31 @@ export const appendAttendance = createServerFn({ method: "POST" })
       studentId: z.string().min(1),
       name: z.string().min(1),
       status: z.string().min(1).default("Present"),
+      institute: z.string().min(1).default("INS003"),
+      role: z.string().min(1).default("Student"),
     }).parse,
   )
   .handler(async ({ data }) => {
     const id = extractSpreadsheetId(data.spreadsheetId);
     await ensureAttendanceSheet(id, data.attendanceSheet);
     const now = new Date();
-    const timestamp = now.toISOString();
-    const date = now.toISOString().slice(0, 10);
-    const range = `${data.attendanceSheet}!A:E`;
+    const scanId = randomScanId();
+    const date = formatDate(now);
+    const inTime = formatTime(now);
+    const range = `${data.attendanceSheet}!A:J`;
     await gw(
       `/spreadsheets/${id}/values/${range}:append?valueInputOption=USER_ENTERED`,
       {
         method: "POST",
         body: JSON.stringify({
-          values: [[timestamp, date, data.studentId, data.name, data.status]],
+          values: [[
+            scanId, data.studentId, data.name, data.institute, date,
+            inTime, "", "", data.role, data.status,
+          ]],
         }),
       },
     );
-    return { ok: true, timestamp, date };
+    return { ok: true, scanId, date, inTime };
   });
 
 export const getTodayAttendance = createServerFn({ method: "POST" })
@@ -154,20 +181,20 @@ export const getTodayAttendance = createServerFn({ method: "POST" })
     const id = extractSpreadsheetId(data.spreadsheetId);
     try {
       const result = await gw(
-        `/spreadsheets/${id}/values/${data.attendanceSheet}!A1:E5000`,
+        `/spreadsheets/${id}/values/${data.attendanceSheet}!A1:J5000`,
       );
       const values: string[][] = result.values ?? [];
       if (values.length <= 1) return { entries: [] };
-      const today = new Date().toISOString().slice(0, 10);
+      const today = formatDate(new Date());
       const entries = values
         .slice(1)
         .map((row, i) => ({
           rowIndex: i + 2,
-          timestamp: row[0] ?? "",
-          date: row[1] ?? "",
-          studentId: row[2] ?? "",
-          name: row[3] ?? "",
-          status: row[4] ?? "",
+          timestamp: row[5] ?? "",
+          date: row[4] ?? "",
+          studentId: row[1] ?? "",
+          name: row[2] ?? "",
+          status: row[9] ?? "",
         }))
         .filter((e) => e.date === today);
       return { entries };
@@ -175,3 +202,4 @@ export const getTodayAttendance = createServerFn({ method: "POST" })
       return { entries: [] };
     }
   });
+
